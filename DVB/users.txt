@@ -1,0 +1,3 @@
+user1:password
+richard:caveman
+user2:mypass

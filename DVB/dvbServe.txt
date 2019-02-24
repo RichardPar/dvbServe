@@ -1,0 +1,1 @@
+./Debug/imageConvert.c.o ./Debug/destination.c.o ./Debug/configuration.c.o ./Debug/utils.c.o ./Debug/session.c.o ./Debug/main.c.o ./Debug/linkedlist.c.o ./Debug/webserv.c.o ./Debug/socketserver.c.o ./Debug/dvbhardware.c.o ./Debug/dictionary.c.o ./Debug/iniparser.c.o ./Debug/sqlite3.c.o ./Debug/database.c.o ./Debug/telnetservermanager.c.o ./Debug/channels.c.o
