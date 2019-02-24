@@ -944,9 +944,8 @@ int dvbt_tune(struct dvb_device_t *tuner, struct dvb_frequency_dvbt_t *freq)
 		tuner->fe_params.u.ofdm.bandwidth = bandwidth_string_to_number(bandwidth);
 		tuner->fe_params.u.ofdm.code_rate_HP = fec_string_to_number(fec_hi);
 		tuner->fe_params.u.ofdm.code_rate_LP = fec_string_to_number(fec_lo);
-		
-        tuner->fe_params.u.ofdm.constellation = modulation_to_number(qam);
-		tuner->fe_params.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+		tuner->fe_params.u.ofdm.constellation = modulation_to_number(qam);
+		tuner->fe_params.u.ofdm.transmission_mode = TRANSMISSION_MODE_8K;
 		tuner->fe_params.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
 		tuner->fe_params.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
 
@@ -960,7 +959,6 @@ int dvbt_tune(struct dvb_device_t *tuner, struct dvb_frequency_dvbt_t *freq)
 	return rc;
 
 }
-
 
 
 static int dvbs_tone_voltage(int fd, char polv, int hi_lo)
@@ -986,53 +984,62 @@ static int dvbs_tone_voltage(int fd, char polv, int hi_lo)
 
 }
 
-int dvbt_tune(struct dvb_device_t *tuner, struct dvb_frequency_dvbt_t *freq)
+int dvbs_tune(struct dvb_device_t *tuner, struct dvb_frequency_dvbs_t *freq)
 {
 	int rc=0;
 	int i;
+//	int tone;
+	int hi_lo;
+	int base;
 
 	unsigned int frequency =  freq->frequency;
-	char *bandwidth = freq->bandwidth;
-	char *fec_hi = freq->fec_hi;
-	char *fec_lo = freq->fec_lo;
-	char *qam = freq->modulation;
+	unsigned int sr = freq->symbolrate;
+	char *fec = freq->fec;
 
 	if (freq == NULL)
-		return 1;
+		return 0;
 
+
+    pthread_mutex_lock(&tuner->tunerLockMutex);
+	usleep(1000);
 	if (frequency != tuner->fe_params.frequency) {
+		tuner->lastber = 9000;
+		printf("Clearing PID filter\n");
 		for (i=0; i<MAX_FILTER_PID; i++) {
 			if (tuner->pids[i].demuxHandle > 0) {
-				//printf("Clearing DEMUX handle %d\n\r",tuner->pids[i].demuxHandle);
 				ioctl(tuner->pids[i].demuxHandle,DMX_STOP);
-				//close(tuner->pids[i].demuxHandle);
-				//tuner->pids[i].demuxHandle=0;
 				tuner->pids[i].pid = 65535;
-				usleep(1000);
 			}
 		}
+		if (frequency < SLOF) {
+			tuner->fe_params.frequency=(frequency-LOF1);
+			hi_lo = 0;
+			base = LOF1;
+		} else {
+			tuner->fe_params.frequency=(frequency-LOF2);
+			hi_lo = 1;
+			base = LOF2;
+		}
 
-		printf("Setting tuner %d to frequency %u (BW %s)\n",tuner->uid,frequency, bandwidth);
-		tuner->fe_params.frequency = frequency;
-		tuner->fe_params.u.ofdm.bandwidth = bandwidth_string_to_number(bandwidth);
-		tuner->fe_params.u.ofdm.code_rate_HP = fec_string_to_number(fec_hi);
-		tuner->fe_params.u.ofdm.code_rate_LP = fec_string_to_number(fec_lo);
-		tuner->fe_params.u.ofdm.constellation = modulation_to_number(qam);
-		tuner->fe_params.u.ofdm.transmission_mode = TRANSMISSION_MODE_8K;
-		tuner->fe_params.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
-		tuner->fe_params.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
+		dvbs_tone_voltage(tuner->frontendHandle,freq->polarity,hi_lo);
 
-		rc = ioctl(tuner->frontendHandle, FE_SET_FRONTEND, &tuner->fe_params);
+		printf("Setting tuner %d to frequency %u (Base %d) Polarity %c (sr %d)\n",tuner->uid,tuner->fe_params.frequency,base,freq->polarity,sr);
+		//usleep(1000);
+		tuner->fe_params.u.qpsk.symbol_rate = sr;
+		tuner->fe_params.u.qpsk.fec_inner = fec_string_to_number(fec);
+		rc = ioctl(tuner->frontendHandle, FE_SET_FRONTEND, &(tuner->fe_params));
 		tuner->sequence++;
 		tuner->curr_frequency_ptr = freq;
+
 	} else
 		printf("Tuner already on the frequency\n");
-
-	usleep(2000);
+		
+	printf("EXIT %s\r\n",__FUNCTION__);
+	usleep(100000);
+    pthread_mutex_unlock(&tuner->tunerLockMutex);
 	return rc;
 
 }
-
 
 struct dvb_frequency_dvbt_t *getInitialTuning_dvbt(struct dvb_device_t *tuner, int id)
 {
