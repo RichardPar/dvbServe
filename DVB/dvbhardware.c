@@ -746,7 +746,7 @@ void *dvb_hardware_thread(void *vtuner)
 		}
 //============================//
 		cnt++;
-		if ((tuner->lastStat < 0x3) && (cnt > CONT_TIME * 2))
+		if ((tuner->lastStat < 0x1F) && (cnt > CONT_TIME * 2))
 			cnt = CONT_TIME * 5;
             
 		if (cnt >= CONT_TIME * 5) {
